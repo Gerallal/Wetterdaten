@@ -5,9 +5,7 @@
 <head>
 
    <meta charset="UTF-8">
-
    <title>Belegarbeit</title>
-
    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
 </head>
@@ -19,27 +17,33 @@
    <script>
 
    function makeplot() {
-     Plotly.d3.json("https://raw.githubusercontent.com/isellsoap/deutschlandGeoJSON/main/2_bundeslaender/1_sehr_hoch.geojson", function(err, geojson){
+      Plotly.d3.json("\\data\\1_sehr_hoch.geo.json", function(err, geojson){
+         const german_states = geojson.features.map(f => f.properties.name);
+         const test_values = new Array(german_states.length).fill(1);
+
       const data = [{
-            type: 'choropleth',
-            geojson: geojson,
-            locations: geojson.features.map(feature => feature.properties.id),
-            z: [10, 20, 30],
-            marker: {line: {width: 0}},
-            featureidkey: 'properties.name',
-         }]
+         type: 'choropleth',
+         locationmode: 'geojson-id',
+         geojson: geojson,
+         locations: german_states,
+         z: test_values,   
+         marker: {line: {width: 1, color: 'black'}},
+         featureidkey: 'properties.name',
+      }];
 
       const layout = {
-          mapbox: {
-            style: "carto-positron",
-            center: { lat: 51.1657, lon: 10.4515 },
-            zoom: 5.5
-          },
-          margin: { t: 0, b: 0 }
-    };
+         geo: {
+            scope: 'europe',
+            projection: {type: 'mercator'},
+            fitbounds: "locations",
+            visible: true
+         },
+         margin: {t: 0, b: 0}
+      };
 
       Plotly.newPlot("myDiv", data, layout);
-});
+
+      });
    }
 
    makeplot();
