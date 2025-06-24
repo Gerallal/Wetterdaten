@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+   <meta charset="UTF-8">
+
+   <title>Belegarbeit</title>
+
+   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+</head>
+
+<body>
+
+   <div id="myDiv" style="width:600px;height:400px;"></div>
+
+   <script>
+
+   function makeplot() {
+     Plotly.d3.json("https://raw.githubusercontent.com/isellsoap/deutschlandGeoJSON/main/2_bundeslaender/1_sehr_hoch.geojson", function(err, geojson){
+      const data = [{
+            type: 'choropleth',
+            geojson: geojson,
+            locations: geojson.features.map(feature => feature.properties.id),
+            z: [10, 20, 30],
+            marker: {line: {width: 0}},
+            featureidkey: 'properties.name',
+         }]
+
+      const layout = {
+          mapbox: {
+            style: "carto-positron",
+            center: { lat: 51.1657, lon: 10.4515 },
+            zoom: 5.5
+          },
+          margin: { t: 0, b: 0 }
+    };
+
+      Plotly.newPlot("myDiv", data, layout);
+});
+   }
+
+   makeplot();
+
+   </script>
