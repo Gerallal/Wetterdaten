@@ -23,7 +23,7 @@
 
    <div id="slider-container">
       <input type="range" id="yearSlider" min="1991" max="2024" value="2024" oninput="updateYear(this.value)">
-      <span id="yearLabel">Jahr: 2024</span>
+      <span id="yearLabel"></span>
    </div>
 
    
@@ -63,17 +63,18 @@
          const lines = text.trim().split("\n");
          const headers = lines[1].split(";").map(h => h.trim());
          const index = headers.indexOf("Deutschland");
+         let year = document.getElementById("yearSlider").value;
 
          const x = [], y = [];
+         let highlightedX = [], highlightedY = [];
          for (let i = 2; i < lines.length; i++) {
             const parts = lines[i].split(";");
             const year = parts[0].trim();
-
-            if (year >= 1991 && year <= 2024) {
+            if (year >= 1991 && year <= 2024 && year === year) {
                const value = parseFloat(parts[index].replace(",", "."));
                if (!isNaN(value)) {
-                  x.push(year);
                   y.push(value);
+                  x.push(year);
                }
             }
          }
@@ -83,20 +84,21 @@
             y: y,
             type: 'scatter',
             mode: 'lines+markers',
-            line: { color: color },
-            marker: { size: 6 },
+            line: { color: '#cccccc' },
+            marker: { size: 12, color: '#cccccc' },
             name: label
          };
 
          const layout = {
-            title: `${label} (1991–2024)`,
-            xaxis: { title: "Jahr" },
+            title: `${label} ${year}`,
+            xaxis: { title: "Jahre" },
             yaxis: { title: unit },
             margin: { t: 40, l: 50, r: 30, b: 50 }
          };
 
          Plotly.newPlot(divId, [trace], layout);
       });
+   
    }
 
    function updateChart(value) {
@@ -113,10 +115,14 @@
       document.getElementById("yearLabel").textContent = "Jahr: " + year;
    }
 
+   document.getElementById("yearSlider").addEventListener("input", function() {
+      updateYear(this.value);
+      updateChart(document.getElementById("dropdown").value);
+   });
+
    showMap();
    showLineChart("data/regional_averages_sd_year.txt", "myDiv2", "orange", "Sonnenscheindauer", "Stunden");
 
-   // LineCart und Map sollen nebeneinandern sein
    </script>
 
 </body>
