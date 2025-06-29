@@ -8,16 +8,37 @@
    <title>Belegarbeit</title>
    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
+   <style>
+      .row {
+         display: flex;
+         flex-direction: row;
+         justify-content: space-around;
+         margin-bottom: 20px;
+      }
+      .chart {
+         width: 48%;
+         height: 400px;
+      }
+   </style>
+
 </head>
 
 <body>
 
-   <div id="myDiv" style="width:600px;height:400px;"></div>
+   <div class="row">
+      <div id="myDiv" class="chart"></div>
+      <div id="myDiv2" class="chart"></div>
+   </div>
+
+   <div class="row">
+      <div id="myDiv3" class="chart"></div>
+      <div id="myDiv4" class="chart"></div>
+   </div>
 
    <script>
 
-   function makeplot() {
-      Plotly.d3.json("\\data\\1_sehr_hoch.geo.json", function(err, geojson){
+   function showMap() {
+      Plotly.d3.json("data/1_sehr_hoch.geo.json", function(err, geojson){
          const german_states = geojson.features.map(f => f.properties.name);
          const test_values = new Array(german_states.length).fill(1);
 
@@ -45,7 +66,58 @@
 
       });
    }
+   
+   function showLineChart(filePath, divId, color, label, unit) {
+      Plotly.d3.text(filePath, function(err, text) {
+      
+      const lines = text.trim().split("\n");
+      const headers = lines[1].split(";").map(h => h.trim());
+      const index = headers.indexOf("Deutschland");
 
-   makeplot();
+      const x = [], y = [];
+      for (let i = 2; i < lines.length; i++) {
+         const parts = lines[i].split(";");
+         const year = parts[0].trim();
+
+         if (year >= 1991 && year <= 2024) {
+            const value = parseFloat(parts[index].replace(",", "."));
+            if (!isNaN(value)) {
+               x.push(year);
+               y.push(value);
+            }
+         }
+      }
+
+      const trace = {
+         x: x,
+         y: y,
+         type: 'scatter',
+         mode: 'lines+markers',
+         line: { color: color },
+         marker: { size: 6 },
+         name: label
+      };
+
+      const layout = {
+         title: `${label} (1991–2024)`,
+         xaxis: { title: "Jahr" },
+         yaxis: { title: unit },
+         margin: { t: 40, l: 50, r: 30, b: 50 }
+      };
+
+      Plotly.newPlot(divId, [trace], layout);
+    });
+   }
+
+   showMap();
+   showLineChart("data/regional_averages_sd_year.txt", "myDiv2", "orange", "Sonnenscheindauer", "Stunden");
+   showLineChart("data/regional_averages_tm_year.txt", "myDiv3", "red", "Lufttemperatur", "°C");
+   showLineChart("data/regional_averages_rr_year.txt", "myDiv4", "blue", "Niederschlag", "mm");
+
+   // TODO: Add dropdown menu for selecting sd, rm or rr
+   // TODO: Add slider instead of normal y-axis (year)
+   // TODO: Add interaction with the map
 
    </script>
+</body>
+</html>

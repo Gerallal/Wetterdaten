@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+  <div id="myDiv2" style="width:600px;height:400px;"></div>
+
+  <script>
+    Plotly.d3.text("data/regional_averages_sd_year.txt", function(err, text) {
+      
+      const lines = text.trim().split("\n");
+      const headers = lines[1].split(";").map(h => h.trim());
+      const index = headers.indexOf("Deutschland");
+
+      const x = [], y = [];
+      for (let i = 2; i < lines.length; i++) {
+        const parts = lines[i].split(";");
+        const year = parts[0].trim();
+        const value = parseFloat(parts[index].replace(",", "."));
+        if (!isNaN(value)) {
+          x.push(year);
+          y.push(value);
+        }
+      }
+
+      console.log("Daten:", x.length, "Jahre,", y.length, "Werte");
+
+      Plotly.newPlot("myDiv2", [{
+        x: x,
+        y: y,
+        type: 'scatter',
+        mode: 'lines+markers'
+      }]);
+    });
+  </script>
+</body>
+</html>
