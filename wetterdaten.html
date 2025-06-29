@@ -1,123 +1,131 @@
 <!DOCTYPE html>
-
-<html lang="en">
-
+<html lang="de">
 <head>
-
    <meta charset="UTF-8">
    <title>Belegarbeit</title>
    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-
    <style>
       .row {
          display: flex;
-         flex-direction: row;
-         justify-content: space-around;
+         flex-direction: column;
+         align-items: center;
          margin-bottom: 20px;
       }
       .chart {
-         width: 48%;
+         width: 90%;
          height: 400px;
+         margin-bottom: 20px;
+      }
+      #dropdown-container {
+         margin-bottom: 10px;
+         text-align: center;
       }
    </style>
-
 </head>
-
 <body>
 
    <div class="row">
       <div id="myDiv" class="chart"></div>
-      <div id="myDiv2" class="chart"></div>
+   </div>
+
+   <div id="dropdown-container">
+      <select id="dropdown" onchange="handleChange(this.value)">
+         <option value="sd">Sonnenscheindauer</option>
+         <option value="tm">Lufttemperatur</option>
+         <option value="rr">Niederschlag</option>
+      </select>
    </div>
 
    <div class="row">
-      <div id="myDiv3" class="chart"></div>
-      <div id="myDiv4" class="chart"></div>
+      <div id="myDiv2" class="chart"></div>
    </div>
 
    <script>
-
    function showMap() {
-      Plotly.d3.json("data/1_sehr_hoch.geo.json", function(err, geojson){
+      Plotly.d3.json("data/1_sehr_hoch.geo.json", function(err, geojson) {
          const german_states = geojson.features.map(f => f.properties.name);
          const test_values = new Array(german_states.length).fill(1);
 
-      const data = [{
-         type: 'choropleth',
-         locationmode: 'geojson-id',
-         geojson: geojson,
-         locations: german_states,
-         z: test_values,   
-         marker: {line: {width: 1, color: 'black'}},
-         featureidkey: 'properties.name',
-      }];
+         const data = [{
+            type: 'choropleth',
+            locationmode: 'geojson-id',
+            geojson: geojson,
+            locations: german_states,
+            z: test_values,
+            marker: { line: { width: 1, color: 'black' } },
+            featureidkey: 'properties.name'
+         }];
 
-      const layout = {
-         geo: {
-            scope: 'europe',
-            projection: {type: 'mercator'},
-            fitbounds: "locations",
-            visible: true
-         },
-         margin: {t: 0, b: 0}
-      };
+         const layout = {
+            geo: {
+               scope: 'europe',
+               projection: { type: 'mercator' },
+               fitbounds: "locations",
+               visible: true
+            },
+            margin: { t: 0, b: 0 }
+         };
 
-      Plotly.newPlot("myDiv", data, layout);
-
+         Plotly.newPlot("myDiv", data, layout);
       });
    }
-   
+
    function showLineChart(filePath, divId, color, label, unit) {
       Plotly.d3.text(filePath, function(err, text) {
-      
-      const lines = text.trim().split("\n");
-      const headers = lines[1].split(";").map(h => h.trim());
-      const index = headers.indexOf("Deutschland");
+         const lines = text.trim().split("\n");
+         const headers = lines[1].split(";").map(h => h.trim());
+         const index = headers.indexOf("Deutschland");
 
-      const x = [], y = [];
-      for (let i = 2; i < lines.length; i++) {
-         const parts = lines[i].split(";");
-         const year = parts[0].trim();
+         const x = [], y = [];
+         for (let i = 2; i < lines.length; i++) {
+            const parts = lines[i].split(";");
+            const year = parts[0].trim();
 
-         if (year >= 1991 && year <= 2024) {
-            const value = parseFloat(parts[index].replace(",", "."));
-            if (!isNaN(value)) {
-               x.push(year);
-               y.push(value);
+            if (year >= 1991 && year <= 2024) {
+               const value = parseFloat(parts[index].replace(",", "."));
+               if (!isNaN(value)) {
+                  x.push(year);
+                  y.push(value);
+               }
             }
          }
+
+         const trace = {
+            x: x,
+            y: y,
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { color: color },
+            marker: { size: 6 },
+            name: label
+         };
+
+         const layout = {
+            title: `${label} (1991–2024)`,
+            xaxis: { title: "Jahr" },
+            yaxis: { title: unit },
+            margin: { t: 40, l: 50, r: 30, b: 50 }
+         };
+
+         Plotly.newPlot(divId, [trace], layout);
+      });
+   }
+
+   function handleChange(value) {
+      if (value === "sd") {
+         showLineChart("data/regional_averages_sd_year.txt", "myDiv2", "orange", "Sonnenscheindauer", "Stunden");
+      } else if (value === "tm") {
+         showLineChart("data/regional_averages_tm_year.txt", "myDiv2", "blue", "Lufttemperatur", "°C");
+      } else if (value === "rr") {
+         showLineChart("data/regional_averages_rr_year.txt", "myDiv2", "green", "Niederschlag", "mm");
       }
-
-      const trace = {
-         x: x,
-         y: y,
-         type: 'scatter',
-         mode: 'lines+markers',
-         line: { color: color },
-         marker: { size: 6 },
-         name: label
-      };
-
-      const layout = {
-         title: `${label} (1991–2024)`,
-         xaxis: { title: "Jahr" },
-         yaxis: { title: unit },
-         margin: { t: 40, l: 50, r: 30, b: 50 }
-      };
-
-      Plotly.newPlot(divId, [trace], layout);
-    });
    }
 
    showMap();
    showLineChart("data/regional_averages_sd_year.txt", "myDiv2", "orange", "Sonnenscheindauer", "Stunden");
-   showLineChart("data/regional_averages_tm_year.txt", "myDiv3", "red", "Lufttemperatur", "°C");
-   showLineChart("data/regional_averages_rr_year.txt", "myDiv4", "blue", "Niederschlag", "mm");
 
-   // TODO: Add dropdown menu for selecting sd, rm or rr
-   // TODO: Add slider instead of normal y-axis (year)
-   // TODO: Add interaction with the map
-
+   // LineCart und Map sollen nebeneinandern sein
    </script>
+
 </body>
 </html>
