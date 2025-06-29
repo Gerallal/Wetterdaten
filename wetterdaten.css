@@ -1,0 +1,17 @@
+.row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.chart {
+    width: 90%;
+    height: 400px;
+    margin-bottom: 20px;
+}
+#dropdown-container {
+    margin-bottom: 10px;
+}
+#slider-container {
+    margin-bottom: 10px;
+}

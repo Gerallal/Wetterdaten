@@ -4,41 +4,29 @@
    <meta charset="UTF-8">
    <title>Belegarbeit</title>
    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-   <style>
-      .row {
-         display: flex;
-         flex-direction: column;
-         align-items: center;
-         margin-bottom: 20px;
-      }
-      .chart {
-         width: 90%;
-         height: 400px;
-         margin-bottom: 20px;
-      }
-      #dropdown-container {
-         margin-bottom: 10px;
-         text-align: center;
-      }
-   </style>
+   <link rel="stylesheet" href="wetterdaten.css" type="text/css">
 </head>
 <body>
 
    <div class="row">
       <div id="myDiv" class="chart"></div>
+      <div id="myDiv2" class="chart"></div>
    </div>
 
    <div id="dropdown-container">
-      <select id="dropdown" onchange="handleChange(this.value)">
+      <select id="dropdown" onchange="updateChart(this.value)">
          <option value="sd">Sonnenscheindauer</option>
          <option value="tm">Lufttemperatur</option>
          <option value="rr">Niederschlag</option>
       </select>
    </div>
 
-   <div class="row">
-      <div id="myDiv2" class="chart"></div>
+   <div id="slider-container">
+      <input type="range" id="yearSlider" min="1991" max="2024" value="2024" oninput="updateYear(this.value)">
+      <span id="yearLabel">Jahr: 2024</span>
    </div>
+
+   
 
    <script>
    function showMap() {
@@ -111,7 +99,7 @@
       });
    }
 
-   function handleChange(value) {
+   function updateChart(value) {
       if (value === "sd") {
          showLineChart("data/regional_averages_sd_year.txt", "myDiv2", "orange", "Sonnenscheindauer", "Stunden");
       } else if (value === "tm") {
@@ -119,6 +107,10 @@
       } else if (value === "rr") {
          showLineChart("data/regional_averages_rr_year.txt", "myDiv2", "green", "Niederschlag", "mm");
       }
+   }
+
+   function updateYear(year) {
+      document.getElementById("yearLabel").textContent = "Jahr: " + year;
    }
 
    showMap();
