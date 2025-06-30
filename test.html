@@ -14,7 +14,7 @@
    </div>
 
    <div id="dropdown-container">
-      <select id="dropdown" onchange="updateChart(this.value)">
+      <select id="dropdown" onchange="updateMapAndChart(this.value)">
          <option value="sd">Sonnenscheindauer</option>
          <option value="tm">Lufttemperatur</option>
          <option value="rr">Niederschlag</option>
@@ -26,54 +26,104 @@
       <span id="yearLabel"></span>
    </div>
 
-   
-
    <script>
+   let currentAttribute = 'sd'; 
+   let currentYear = 2024; 
+
+   const attributeFilePaths = {
+      sd: "data/regional_averages_sd_year.txt",
+      tm: "data/regional_averages_tm_year.txt",
+      rr: "data/regional_averages_rr_year.txt"
+   };
+
+   const filePath = attributeFilePaths[currentAttribute];
+
    function showMap() {
-      Plotly.d3.json("data/1_sehr_hoch.geo.json", function(err, geojson) {
-         const german_states = geojson.features.map(f => f.properties.name);
-         const test_values = new Array(german_states.length).fill(1);
+      Plotly.d3.text(filePath, function(err, text) {
 
-         const data = [{
-            type: 'choropleth',
-            locationmode: 'geojson-id',
-            geojson: geojson,
-            locations: german_states,
-            z: test_values,
-            marker: { line: { width: 1, color: 'black' } },
-            featureidkey: 'properties.name'
-         }];
+         const lines = text.trim().split("\n");
+         const headers = lines[1].split(";").map(h => h.trim());
+         const index = headers.indexOf("Deutschland"); 
+         
+         const stateValues = {};
 
-         const layout = {
-            geo: {
-               scope: 'europe',
-               projection: { type: 'mercator' },
-               fitbounds: "locations",
-               visible: true
-            },
-            margin: { t: 0, b: 0 }
-         };
+         for (let i = 2; i < lines.length; i++) {
+            const parts = lines[i].split(";");
+            const currentYearData = parts[0].trim();
 
-         Plotly.newPlot("myDiv", data, layout, {scrollZoom: false});
+            if (currentYearData == currentYear) {
+               for (let j = 1; j < headers.length; j++) {
+                  const state = headers[j]; 
+                  const value = parseFloat(parts[j].replace(",", "."));
+                  if (!isNaN(value)) {
+                     if (!stateValues[state]) {
+                        stateValues[state] = {};
+                     }
+                     stateValues[state][currentYearData] = value;
+                  }
+               }
+            }
+         }
+
+         Plotly.d3.json("data/1_sehr_hoch.geo.json", function(err, geojson) {
+            const german_states = geojson.features.map(f => f.properties.name);
+            const test_values = german_states.map(state => stateValues[state] && stateValues[state][currentYear] || 0); 
+
+            const data = [{
+               type: 'choropleth',
+               locationmode: 'geojson-id',
+               geojson: geojson,
+               locations: german_states,
+               z: test_values,
+               text: german_states.map(state => `Wert: ${stateValues[state] && stateValues[state][currentYear] || "Daten fehlen"} ${currentAttribute === 'sd' ? 'Stunden' : (currentAttribute === 'tm' ? '°C' : 'mm')}`), 
+               hoverinfo: 'location+z+text',
+               marker: { line: { width: 1, color: 'black' } },
+               featureidkey: 'properties.name'
+            }];
+
+            const layout = {
+               geo: {
+                  scope: 'europe',
+                  projection: { type: 'mercator' },
+                  fitbounds: "locations",
+                  visible: true
+               },
+               margin: { t: 0, b: 0 }
+            };
+
+            Plotly.newPlot("myDiv", data, layout);
+         });
       });
    }
 
-   function showLineChart(filePath, divId, color, label, unit) {
+   function showLineChart() {
       Plotly.d3.text(filePath, function(err, text) {
          const lines = text.trim().split("\n");
          const headers = lines[1].split(";").map(h => h.trim());
          const index = headers.indexOf("Deutschland");
-         let year = document.getElementById("yearSlider").value;
 
          const x = [], y = [];
+         let highlightedX = [], highlightedY = [];
+
          for (let i = 2; i < lines.length; i++) {
             const parts = lines[i].split(";");
-            const year = parts[0].trim();
-            if (year >= 1991 && year <= 2024 && year === year) {
+            const currentYearData = parts[0].trim();
+            
+            if (currentYearData == currentYear) {
+               for (let j = 1; j < headers.length; j++) {
+                  const value = parseFloat(parts[j].replace(",", "."));
+                  if (!isNaN(value)) {
+                     highlightedX.push(currentYearData);
+                     highlightedY.push(value);
+                  }
+               }
+            }
+
+            if (currentYearData >= 1991 && currentYearData <= 2024) {
                const value = parseFloat(parts[index].replace(",", "."));
                if (!isNaN(value)) {
+                  x.push(currentYearData);
                   y.push(value);
-                  x.push(year);
                }
             }
          }
@@ -83,44 +133,52 @@
             y: y,
             type: 'scatter',
             mode: 'lines+markers',
-            line: { color: color },
-            marker: { size: 6 },
-            name: label
+            line: { color: '#cccccc' },
+            marker: { size: 12, color: '#cccccc' },
+            name: `${currentAttribute === 'sd' ? 'Sonnenscheindauer' : (currentAttribute === 'tm' ? 'Lufttemperatur' : 'Niederschlag')}`
+         };
+
+         const highlightedTrace = {
+            x: highlightedX,
+            y: highlightedY,
+            type: 'scatter',
+            mode: 'markers',
+            marker: { size: 12, color: currentAttribute === 'sd' ? 'orange' : (currentAttribute === 'tm' ? 'blue' : 'green') },
+            name: `${currentAttribute === 'sd' ? 'Sonnenscheindauer' : (currentAttribute === 'tm' ? 'Lufttemperatur' : 'Niederschlag')} (Jahr ${currentYear})`
          };
 
          const layout = {
-            title: `${label} ${year}`,
+            title: `${currentAttribute === 'sd' ? 'Sonnenscheindauer' : (currentAttribute === 'tm' ? 'Lufttemperatur' : 'Niederschlag')} im Jahr ${currentYear}`,
             xaxis: { title: "Jahre" },
-            yaxis: { title: unit },
+            yaxis: { title: currentAttribute === 'sd' ? 'Stunden' : (currentAttribute === 'tm' ? '°C' : 'mm') },
             margin: { t: 40, l: 50, r: 30, b: 50 }
          };
 
-         Plotly.newPlot(divId, [trace], layout);
+         Plotly.newPlot("myDiv2", [trace, highlightedTrace], layout);
       });
-   
    }
 
-   function updateChart(value) {
-      if (value === "sd") {
-         showLineChart("data/regional_averages_sd_year.txt", "myDiv2", "orange", "Sonnenscheindauer", "Stunden");
-      } else if (value === "tm") {
-         showLineChart("data/regional_averages_tm_year.txt", "myDiv2", "blue", "Lufttemperatur", "°C");
-      } else if (value === "rr") {
-         showLineChart("data/regional_averages_rr_year.txt", "myDiv2", "green", "Niederschlag", "mm");
-      }
+   function updateMapAndChart(value) {
+      currentAttribute = value;
+      showMap();
+      showLineChart();
    }
 
    function updateYear(year) {
+      currentYear = year;
       document.getElementById("yearLabel").textContent = "Jahr: " + year;
+      showMap();
+      showLineChart();
    }
 
    document.getElementById("yearSlider").addEventListener("input", function() {
       updateYear(this.value);
-      updateChart(document.getElementById("dropdown").value);
+      updateMapAndChart(document.getElementById("dropdown").value);
    });
 
+
    showMap();
-   showLineChart("data/regional_averages_sd_year.txt", "myDiv2", "orange", "Sonnenscheindauer", "Stunden");
+   showLineChart();
 
    </script>
 
