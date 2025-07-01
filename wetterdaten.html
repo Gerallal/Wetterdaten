@@ -36,48 +36,100 @@
       rr: "data/regional_averages_rr_year.txt"
    };
 
+   // Farbskalen von plotly.com, ohne .reverse(), denn reversescale:true dreht die Skala automatisch um
+   const colorScales = {
+      sd: 'YlOrRd',   // Sonnenscheindauer
+      tm: 'RdBu',     // Lufttemperatur
+      rr: 'YlGnBu'    // Niederschlag
+   };
+
    function showMap() {
-      const filePath = attributeFilePaths[currentAttribute] + `?t=${Date.now()}`;
+      const filePath = attributeFilePaths[currentAttribute];
 
       Plotly.d3.text(filePath, function(err, text) {
+         if (err) {
+            console.error("Fehler beim Laden der Datei:", filePath);
+            return;
+         }
+
          const lines = text.trim().split("\n");
          const headers = lines[1].split(";").map(h => h.trim());
-         const index = headers.indexOf("Deutschland"); 
-         
-         const stateValues = {};
+         const indexDeutschland = headers.indexOf("Deutschland");
 
+         const stateValues = {};
+         const germanStates = [];
+
+         // Für alle Bundesländer die Werte im aktuellen Jahr sammeln
          for (let i = 2; i < lines.length; i++) {
             const parts = lines[i].split(";");
-            const currentYearData = parts[0].trim();
-
-            if (currentYearData == currentYear) {
+            const yearData = parts[0].trim();
+            if (yearData == currentYear) {
                for (let j = 1; j < headers.length; j++) {
-                  const state = headers[j]; 
-                  const value = parseFloat(parts[j].replace(",", "."));
-                  if (!isNaN(value)) {
-                     if (!stateValues[state]) {
-                        stateValues[state] = {};
-                     }
-                     stateValues[state][currentYearData] = value;
+                  const state = headers[j];
+                  if (!germanStates.includes(state)) germanStates.push(state);
+                  const val = parseFloat(parts[j].replace(",", "."));
+                  if (!isNaN(val)) {
+                     if (!stateValues[state]) stateValues[state] = {};
+                     stateValues[state][yearData] = val;
                   }
                }
             }
          }
 
          Plotly.d3.json("data/1_sehr_hoch.geo.json", function(err, geojson) {
-            const german_states = geojson.features.map(f => f.properties.name);
-            const test_values = german_states.map(state => stateValues[state] && stateValues[state][currentYear] || 0); 
+            if (err) {
+               console.error("Fehler beim Laden der GeoJSON-Datei");
+               return;
+            }
+
+            // Werte für die Bundesländer, für Farbskala bestimmen
+            const values = germanStates.map(state => 
+               (stateValues[state] && stateValues[state][currentYear] !== undefined) ? stateValues[state][currentYear] : null
+            );
+
+            // Filtere gültige Werte für min/max Berechnung
+            const validValues = values.filter(v => v !== null);
+
+            // Berechne zmin, zmax abhängig vom Attribut
+            let zmin = Math.min(...validValues);
+            let zmax = Math.max(...validValues);
+            let reversescale = true; // Skala von hell nach dunkel
+
+            // Für Lufttemperatur (divergente Skala RdBu) symmetrisch um Mittelwert setzen
+            if (currentAttribute === 'tm') {
+               const meanVal = validValues.reduce((a,b) => a+b, 0) / validValues.length;
+               const absMax = Math.max(...validValues.map(v => Math.abs(v - meanVal)));
+               zmin = meanVal - absMax;
+               zmax = meanVal + absMax;
+            }
 
             const data = [{
                type: 'choropleth',
                locationmode: 'geojson-id',
                geojson: geojson,
-               locations: german_states,
-               z: test_values,
-               text: german_states.map(state => `Wert: ${stateValues[state] && stateValues[state][currentYear] || "Daten fehlen"} ${currentAttribute === 'sd' ? 'Stunden' : (currentAttribute === 'tm' ? '°C' : 'mm')}`), 
-               hoverinfo: 'location+z+text',
+               locations: germanStates,
+               z: values,
+               colorscale: colorScales[currentAttribute],
+               reversescale: reversescale,
                marker: { line: { width: 1, color: 'black' } },
-               featureidkey: 'properties.name'
+               featureidkey: 'properties.name',
+               text: germanStates.map(state => {
+                  const val = stateValues[state] && stateValues[state][currentYear];
+                  return val !== undefined ? 
+                     `Wert: ${val} ${currentAttribute === 'sd' ? 'Stunden' : (currentAttribute === 'tm' ? '°C' : 'mm')}` : 
+                     "Daten fehlen";
+               }),
+               hoverinfo: 'location+z+text',
+               zmin: zmin,
+               zmax: zmax,
+               colorbar: {
+                  title: currentAttribute === 'sd' ? 'Stunden' : (currentAttribute === 'tm' ? '°C' : 'mm'),
+                  outlinewidth: 0
+               },
+               // fehlende Daten weiß färben:
+               // zmin/zmax und colorscale zeigen bei null oder undefined leider nicht automatisch weiß
+               // wir können das über 'zauto' nicht steuern, aber Plotly malt 'null' Werte transparent
+               // Um diese sichtbar als weiß zu machen, nutzen wir die geo Layout-Eigenschaft "bgcolor"
             }];
 
             const layout = {
@@ -85,46 +137,54 @@
                   scope: 'europe',
                   projection: { type: 'mercator' },
                   fitbounds: "locations",
-                  visible: true
+                  visible: true,
+                  bgcolor: 'white' // Hintergrundfarbe, damit fehlende Daten als weiß erscheinen
                },
                margin: { t: 0, b: 0 }
             };
 
-            Plotly.newPlot("myDiv", data, layout);
+            Plotly.newPlot("myDiv", data, layout, {displayModeBar: false});
          });
       });
    }
 
    function showLineChart() {
-      const filePath = attributeFilePaths[currentAttribute] + `?t=${Date.now()}`;
+      const filePath = attributeFilePaths[currentAttribute];
 
       Plotly.d3.text(filePath, function(err, text) {
+         if (err) {
+            console.error("Fehler beim Laden der Datei:", filePath);
+            return;
+         }
+
          const lines = text.trim().split("\n");
          const headers = lines[1].split(";").map(h => h.trim());
-         const index = headers.indexOf("Deutschland");
+         const indexDeutschland = headers.indexOf("Deutschland");
 
          const x = [], y = [];
-         let highlightedX = [], highlightedY = [];
+         const highlightedX = [], highlightedY = [];
 
          for (let i = 2; i < lines.length; i++) {
             const parts = lines[i].split(";");
-            const currentYearData = parts[0].trim();
-            
-            if (currentYearData == currentYear) {
+            const yearData = parts[0].trim();
+
+            // Für Hervorhebung nur aktuelles Jahr
+            if (yearData == currentYear) {
                for (let j = 1; j < headers.length; j++) {
-                  const value = parseFloat(parts[j].replace(",", "."));
-                  if (!isNaN(value)) {
-                     highlightedX.push(currentYearData);
-                     highlightedY.push(value);
+                  const val = parseFloat(parts[j].replace(",", "."));
+                  if (!isNaN(val)) {
+                     highlightedX.push(yearData);
+                     highlightedY.push(val);
                   }
                }
             }
 
-            if (currentYearData >= 1991 && currentYearData <= 2024) {
-               const value = parseFloat(parts[index].replace(",", "."));
-               if (!isNaN(value)) {
-                  x.push(currentYearData);
-                  y.push(value);
+            // Für die Linie von 1991 bis 2024 nur Deutschland
+            if (yearData >= 1991 && yearData <= 2024) {
+               const val = parseFloat(parts[indexDeutschland].replace(",", "."));
+               if (!isNaN(val)) {
+                  x.push(yearData);
+                  y.push(val);
                }
             }
          }
@@ -155,7 +215,7 @@
             margin: { t: 40, l: 50, r: 30, b: 50 }
          };
 
-         Plotly.newPlot("myDiv2", [trace, highlightedTrace], layout);
+         Plotly.newPlot("myDiv2", [trace, highlightedTrace], layout, {displayModeBar: false});
       });
    }
 
