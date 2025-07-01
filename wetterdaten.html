@@ -36,7 +36,6 @@
       rr: "data/regional_averages_rr_year.txt"
    };
 
-   // Farbskalen von plotly.com, ohne .reverse(), denn reversescale:true dreht die Skala automatisch um
    const colorScales = {
       sd: 'YlOrRd',   // Sonnenscheindauer
       tm: 'RdBu',     // Lufttemperatur
@@ -59,7 +58,6 @@
          const stateValues = {};
          const germanStates = [];
 
-         // Für alle Bundesländer die Werte im aktuellen Jahr sammeln
          for (let i = 2; i < lines.length; i++) {
             const parts = lines[i].split(";");
             const yearData = parts[0].trim();
@@ -82,20 +80,16 @@
                return;
             }
 
-            // Werte für die Bundesländer, für Farbskala bestimmen
             const values = germanStates.map(state => 
                (stateValues[state] && stateValues[state][currentYear] !== undefined) ? stateValues[state][currentYear] : null
             );
 
-            // Filtere gültige Werte für min/max Berechnung
             const validValues = values.filter(v => v !== null);
 
-            // Berechne zmin, zmax abhängig vom Attribut
             let zmin = Math.min(...validValues);
             let zmax = Math.max(...validValues);
-            let reversescale = true; // Skala von hell nach dunkel
+            let reversescale = true;
 
-            // Für Lufttemperatur (divergente Skala RdBu) symmetrisch um Mittelwert setzen
             if (currentAttribute === 'tm') {
                const meanVal = validValues.reduce((a,b) => a+b, 0) / validValues.length;
                const absMax = Math.max(...validValues.map(v => Math.abs(v - meanVal)));
@@ -103,14 +97,13 @@
                zmax = meanVal + absMax;
             }
 
-            const data = [{
+            const trace = {
                type: 'choropleth',
                locationmode: 'geojson-id',
                geojson: geojson,
                locations: germanStates,
                z: values,
                colorscale: colorScales[currentAttribute],
-               reversescale: reversescale,
                marker: { line: { width: 1, color: 'black' } },
                featureidkey: 'properties.name',
                text: germanStates.map(state => {
@@ -125,12 +118,17 @@
                colorbar: {
                   title: currentAttribute === 'sd' ? 'Stunden' : (currentAttribute === 'tm' ? '°C' : 'mm'),
                   outlinewidth: 0
-               },
-               // fehlende Daten weiß färben:
-               // zmin/zmax und colorscale zeigen bei null oder undefined leider nicht automatisch weiß
-               // wir können das über 'zauto' nicht steuern, aber Plotly malt 'null' Werte transparent
-               // Um diese sichtbar als weiß zu machen, nutzen wir die geo Layout-Eigenschaft "bgcolor"
-            }];
+               }
+            };
+
+            // Bedingtes Setzen von reversescale:
+            if (colorScales[currentAttribute] !== 'RdBu') {
+               trace.reversescale = true;
+            } else {
+               trace.reversescale = false;
+            }
+
+            const data = [trace];
 
             const layout = {
                geo: {
@@ -138,7 +136,7 @@
                   projection: { type: 'mercator' },
                   fitbounds: "locations",
                   visible: true,
-                  bgcolor: 'white' // Hintergrundfarbe, damit fehlende Daten als weiß erscheinen
+                  bgcolor: 'white'
                },
                margin: { t: 0, b: 0 }
             };
@@ -168,7 +166,6 @@
             const parts = lines[i].split(";");
             const yearData = parts[0].trim();
 
-            // Für Hervorhebung nur aktuelles Jahr
             if (yearData == currentYear) {
                for (let j = 1; j < headers.length; j++) {
                   const val = parseFloat(parts[j].replace(",", "."));
@@ -179,7 +176,6 @@
                }
             }
 
-            // Für die Linie von 1991 bis 2024 nur Deutschland
             if (yearData >= 1991 && yearData <= 2024) {
                const val = parseFloat(parts[indexDeutschland].replace(",", "."));
                if (!isNaN(val)) {
@@ -237,7 +233,7 @@
       updateMapAndChart(document.getElementById("dropdown").value);
    });
 
-   // Initiale Anzeige
+   // Initial
    document.getElementById("yearLabel").textContent = "Jahr: " + currentYear;
    showMap();
    showLineChart();
