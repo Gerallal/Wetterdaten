@@ -36,11 +36,10 @@
       rr: "data/regional_averages_rr_year.txt"
    };
 
-   const filePath = attributeFilePaths[currentAttribute];
-
    function showMap() {
-      Plotly.d3.text(filePath, function(err, text) {
+      const filePath = attributeFilePaths[currentAttribute] + `?t=${Date.now()}`;
 
+      Plotly.d3.text(filePath, function(err, text) {
          const lines = text.trim().split("\n");
          const headers = lines[1].split(";").map(h => h.trim());
          const index = headers.indexOf("Deutschland"); 
@@ -97,6 +96,8 @@
    }
 
    function showLineChart() {
+      const filePath = attributeFilePaths[currentAttribute] + `?t=${Date.now()}`;
+
       Plotly.d3.text(filePath, function(err, text) {
          const lines = text.trim().split("\n");
          const headers = lines[1].split(";").map(h => h.trim());
@@ -176,7 +177,8 @@
       updateMapAndChart(document.getElementById("dropdown").value);
    });
 
-
+   // Initiale Anzeige
+   document.getElementById("yearLabel").textContent = "Jahr: " + currentYear;
    showMap();
    showLineChart();
 
