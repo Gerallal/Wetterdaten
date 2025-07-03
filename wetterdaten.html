@@ -167,14 +167,13 @@
             const yearData = parts[0].trim();
 
             if (yearData == currentYear) {
-               for (let j = 1; j < headers.length; j++) {
-                  const val = parseFloat(parts[j].replace(",", "."));
-                  if (!isNaN(val)) {
-                     highlightedX.push(yearData);
-                     highlightedY.push(val);
-                  }
+               const val = parseFloat(parts[indexDeutschland].replace(",", "."));
+               if (!isNaN(val)) {
+                  highlightedX.push(yearData);
+                  highlightedY.push(val);
                }
             }
+
 
             if (yearData >= 1991 && yearData <= 2024) {
                const val = parseFloat(parts[indexDeutschland].replace(",", "."));
@@ -228,10 +227,23 @@
       showLineChart();
    }
 
-   document.getElementById("yearSlider").addEventListener("input", function() {
-      updateYear(this.value);
+   function debounce(func, delay) {
+      let timeout;
+      return function (...args) {
+         clearTimeout(timeout);
+         timeout = setTimeout(() => func.apply(this, args), delay);
+      };
+   }
+
+
+   const debouncedUpdate = debounce(function () {
+      const year = document.getElementById("yearSlider").value;
+      updateYear(year);
       updateMapAndChart(document.getElementById("dropdown").value);
-   });
+   }, 300); // 300 ms Wartezeit nach letztem Input
+
+   document.getElementById("yearSlider").addEventListener("input", debouncedUpdate);
+
 
    // Initial
    document.getElementById("yearLabel").textContent = "Jahr: " + currentYear;
