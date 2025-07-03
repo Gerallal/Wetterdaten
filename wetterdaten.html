@@ -27,13 +27,13 @@
    </div>
 
    <script>
-   let currentAttribute = 'sd'; 
-   let currentYear = 2024; 
+   let currentAttribute = 'sd'; // Standardmäßig Sonnenscheindauer
+   let currentYear = 2024; // Standardmäßig 2024
 
    const attributeFilePaths = {
-      sd: "data/regional_averages_sd_year.txt",
-      tm: "data/regional_averages_tm_year.txt",
-      rr: "data/regional_averages_rr_year.txt"
+      sd: "data/regional_averages_sd_year.txt", // Sonnenscheindauer
+      tm: "data/regional_averages_tm_year.txt", // Lufttemperatur
+      rr: "data/regional_averages_rr_year.txt" // Niederschlag
    };
 
    const colorScales = {
@@ -43,14 +43,18 @@
    };
 
    function showMap() {
+      // Laden der entsprechenden Attributdatei, je nach Attributauswahl
       const filePath = attributeFilePaths[currentAttribute];
 
+      // Laden der Textdatei mit den Attributdaten
       Plotly.d3.text(filePath, function(err, text) {
+         // Fehlerbehebung, falls Datei nicht geladen wird
          if (err) {
             console.error("Fehler beim Laden der Datei:", filePath);
             return;
          }
 
+         // Extrahieren der Daten aus der Textdatei
          const lines = text.trim().split("\n");
          const headers = lines[1].split(";").map(h => h.trim());
          const indexDeutschland = headers.indexOf("Deutschland");
@@ -58,14 +62,19 @@
          const stateValues = {};
          const germanStates = [];
 
+         // Extrahieren der Werte für das aktuelle Jahr, was über den Slider ausgewählt wird
          for (let i = 2; i < lines.length; i++) {
             const parts = lines[i].split(";");
             const yearData = parts[0].trim();
+            // Prüfen, ob das Jahr mit dem aktuellen Jahr übereinstimmt
             if (yearData == currentYear) {
+               // Extrahieren der Werte für Deutschland und die Bundesländer
                for (let j = 1; j < headers.length; j++) {
                   const state = headers[j];
+                  // Prüfen, ob der Bundeslandname gültig ist
                   if (!germanStates.includes(state)) germanStates.push(state);
                   const val = parseFloat(parts[j].replace(",", "."));
+                  // Prüfen, ob der Wert eine gültige Zahl ist
                   if (!isNaN(val)) {
                      if (!stateValues[state]) stateValues[state] = {};
                      stateValues[state][yearData] = val;
@@ -74,38 +83,43 @@
             }
          }
 
+         // Laden der GeoJSON-Datei, nur für Deutschland
+         // Quelle: https://github.com/isellsoap/deutschlandGeoJSON/blob/main/2_bundeslaender/1_sehr_hoch.geo.json 
          Plotly.d3.json("data/1_sehr_hoch.geo.json", function(err, geojson) {
+            // Fehlerbehebung
             if (err) {
                console.error("Fehler beim Laden der GeoJSON-Datei");
                return;
             }
 
+            // Extrahieren der Werte für die Bundesländer
             const values = germanStates.map(state => 
                (stateValues[state] && stateValues[state][currentYear] !== undefined) ? stateValues[state][currentYear] : null
             );
 
+            // Überprüfen, ob Werte vorhanden sind
             const validValues = values.filter(v => v !== null);
 
-            let zmin = Math.min(...validValues);
-            let zmax = Math.max(...validValues);
-            let reversescale = true;
+            const fixedColorRanges = {
+               sd: { zmin: 1400, zmax: 2200 }, // Stunden
+               tm: { zmin: 7, zmax: 11 },      // °C
+               rr: { zmin: 400, zmax: 1100 }   // mm
+            };
 
-            if (currentAttribute === 'tm') {
-               const meanVal = validValues.reduce((a,b) => a+b, 0) / validValues.length;
-               const absMax = Math.max(...validValues.map(v => Math.abs(v - meanVal)));
-               zmin = meanVal - absMax;
-               zmax = meanVal + absMax;
-            }
+            const { zmin, zmax } = fixedColorRanges[currentAttribute]; // Minimale und maximale Werte für die Legende
+            let reversescale = true; // Attribut-Colorscales umkehren
 
+            // Erstellen des Trace-Objekts für die Karte
             const trace = {
                type: 'choropleth',
                locationmode: 'geojson-id',
                geojson: geojson,
                locations: germanStates,
                z: values,
-               colorscale: colorScales[currentAttribute],
+               colorscale: colorScales[currentAttribute], // Farben je nach Attribut
                marker: { line: { width: 1, color: 'black' } },
                featureidkey: 'properties.name',
+               // Tooltip-Text für Hover-Effekte
                text: germanStates.map(state => {
                   const val = stateValues[state] && stateValues[state][currentYear];
                   return val !== undefined ? 
@@ -121,15 +135,14 @@
                }
             };
 
-            // Bedingtes Setzen von reversescale:
+            // Colorscales reversen, außer bei Lufttemperatur
             if (colorScales[currentAttribute] !== 'RdBu') {
                trace.reversescale = true;
             } else {
                trace.reversescale = false;
             }
 
-            const data = [trace];
-
+            // Layout für die Karte
             const layout = {
                geo: {
                   scope: 'europe',
@@ -141,47 +154,57 @@
                margin: { t: 0, b: 0 }
             };
 
-            Plotly.newPlot("myDiv", data, layout, {displayModeBar: false});
+            // Erstellen der Karte in myDiv mit Plotly
+            Plotly.newPlot("myDiv", [trace], layout);
          });
       });
    }
 
    function showLineChart() {
+
       const filePath = attributeFilePaths[currentAttribute];
 
       Plotly.d3.text(filePath, function(err, text) {
          if (err) {
-            console.error("Fehler beim Laden der Datei:", filePath);
+            console.error("Fehler:", filePath);
             return;
          }
 
+         // Extrahieren der Daten aus der Textdatei
          const lines = text.trim().split("\n");
          const headers = lines[1].split(";").map(h => h.trim());
-         const indexDeutschland = headers.indexOf("Deutschland");
+         const stateIndices = headers.map((name, index) => ({ name, index })).filter(obj => obj.name !== "Deutschland" && obj.index > 0);
 
          const x = [], y = [];
-         const highlightedX = [], highlightedY = [];
+         const highlightedX = [], highlightedY = []; // Nur das Jahr wird gehighlighted, welches ausgewählt ist
 
+         // Extrahieren der Werte für das aktuelle Jahr, was über den Slider ausgewählt wird
          for (let i = 2; i < lines.length; i++) {
             const parts = lines[i].split(";");
             const yearData = parts[0].trim();
 
-            if (yearData == currentYear) {
-               const val = parseFloat(parts[indexDeutschland].replace(",", "."));
-               if (!isNaN(val)) {
-                  highlightedX.push(yearData);
-                  highlightedY.push(val);
-               }
-            }
+            const values = [];
 
-
-            if (yearData >= 1991 && yearData <= 2024) {
-               const val = parseFloat(parts[indexDeutschland].replace(",", "."));
-               if (!isNaN(val)) {
-                  x.push(yearData);
-                  y.push(val);
+            // Extrahieren der Werte für die Bundesländer
+            for(let s of stateIndices) {
+                  const val = parseFloat(parts[s.index].replace(",", "."));
+                  if (!isNaN(val)) {
+                     values.push(val);
+                  }
                }
-            }
+
+               // Nur wenn Werte für das Jahr vorhanden sind, wird es in x und y gepusht eingefügt
+               if(values.length > 0) {
+                  const avg = values.reduce((a,b) => a + b, 0) / values.length;
+                  x.push(yearData); // Jahr
+                  y.push(avg); // Durchschnittswert
+
+                  if (yearData == currentYear.toString()) {
+                     highlightedX.push(yearData); // Jahr für Highlight
+                     highlightedY.push(avg); // Durchschnittswert für Highlight
+               
+                  }
+               } 
          }
 
          const trace = {
@@ -199,7 +222,7 @@
             y: highlightedY,
             type: 'scatter',
             mode: 'markers',
-            marker: { size: 12, color: currentAttribute === 'sd' ? 'orange' : (currentAttribute === 'tm' ? 'blue' : 'green') },
+            marker: { size: 12, color: currentAttribute === 'sd' ? 'orange' : (currentAttribute === 'tm' ? 'purple' : 'blue') },
             name: `${currentAttribute === 'sd' ? 'Sonnenscheindauer' : (currentAttribute === 'tm' ? 'Lufttemperatur' : 'Niederschlag')} (Jahr ${currentYear})`
          };
 
@@ -214,12 +237,14 @@
       });
    }
 
+   // Anzeige der Karte und des Diagramms
    function updateMapAndChart(value) {
       currentAttribute = value;
       showMap();
       showLineChart();
    }
 
+   // Aktualisierung des Jahreslabels und der Karte/Diagramm bei Verschiebung des Sliders
    function updateYear(year) {
       currentYear = year;
       document.getElementById("yearLabel").textContent = "Jahr: " + year;
@@ -227,6 +252,7 @@
       showLineChart();
    }
 
+   // Debounce-Funktion, um die Anzahl der Aktualisierungen zu reduzieren -> bessere Performance
    function debounce(func, delay) {
       let timeout;
       return function (...args) {
@@ -235,17 +261,17 @@
       };
    }
 
-
+   // Aktualisierung des Jahres und der Karte/Diagramm
    const debouncedUpdate = debounce(function () {
       const year = document.getElementById("yearSlider").value;
       updateYear(year);
       updateMapAndChart(document.getElementById("dropdown").value);
    }, 300); // 300 ms Wartezeit nach letztem Input
 
+   // Event-Listener für den Dropdown und den Slider
    document.getElementById("yearSlider").addEventListener("input", debouncedUpdate);
 
-
-   // Initial
+   // Initialisierung der Karte und des Diagramms
    document.getElementById("yearLabel").textContent = "Jahr: " + currentYear;
    showMap();
    showLineChart();
