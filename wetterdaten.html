@@ -182,29 +182,36 @@
          for (let i = 2; i < lines.length; i++) {
             const parts = lines[i].split(";");
             const yearData = parts[0].trim();
+            const yearNumber = parseInt(yearData); // Nur Jahre zwischen 1991 und 2024
 
-            const values = [];
+            // Nur Jahre zwischen 1991 und 2024
+            if (yearNumber >= 1991 && yearNumber <= 2024) {
+               // Nur das aktuelle Jahr
+               const values = [];
 
-            // Extrahieren der Werte für die Bundesländer
-            for(let s of stateIndices) {
-                  const val = parseFloat(parts[s.index].replace(",", "."));
-                  if (!isNaN(val)) {
-                     values.push(val);
+               // Extrahieren der Werte für die Bundesländer
+               for(let s of stateIndices) {
+                     const val = parseFloat(parts[s.index].replace(",", "."));
+                     if (!isNaN(val)) {
+                        values.push(val);
+                     }
                   }
-               }
 
-               // Nur wenn Werte für das Jahr vorhanden sind, wird es in x und y gepusht eingefügt
-               if(values.length > 0) {
-                  const avg = values.reduce((a,b) => a + b, 0) / values.length;
-                  x.push(yearData); // Jahr
-                  y.push(avg); // Durchschnittswert
+                  // Nur wenn Werte für das Jahr vorhanden sind, wird es in x und y gepusht eingefügt
+                  if(values.length > 0) {
+                     const avg = values.reduce((a,b) => a + b, 0) / values.length;
+                     x.push(yearData); // Jahr
+                     y.push(avg); // Durchschnittswert
 
-                  if (yearData == currentYear.toString()) {
-                     highlightedX.push(yearData); // Jahr für Highlight
-                     highlightedY.push(avg); // Durchschnittswert für Highlight
-               
-                  }
-               } 
+                     if (parseInt(yearData) == currentYear) {
+                        highlightedX.push(yearData); // Jahr für Highlight
+                        highlightedY.push(avg); // Durchschnittswert für Highlight
+                  
+                     }
+                  } 
+            } 
+            
+  
          }
 
          const trace = {
