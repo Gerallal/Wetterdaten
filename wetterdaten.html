@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
    <meta charset="UTF-8">
-   <title>Belegarbeit</title>
+   <title>Belegarbeit Versuch 2</title>
    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
    <link rel="stylesheet" href="wetterdaten.css" type="text/css">
 </head>
@@ -42,6 +42,27 @@
       rr: 'YlGnBu'    // Niederschlag
    };
 
+   const stateNameMapping = {
+      "Baden-Wuerttemberg": "Baden-Württemberg",
+      "Bayern": "Bayern",
+      "Brandenburg/Berlin": "Berlin",
+      "Brandenburg": "Brandenburg", 
+      "Hessen": "Hessen",
+      "Mecklenburg-Vorpommern": "Mecklenburg-Vorpommern",
+      "Nordrhein-Westfalen": "Nordrhein-Westfalen",
+      "Rheinland-Pfalz": "Rheinland-Pfalz",
+      "Saarland": "Saarland",
+      "Sachsen": "Sachsen",
+      "Sachsen-Anhalt": "Sachsen-Anhalt",
+      "Schleswig-Holstein": "Schleswig-Holstein",
+      "Thueringen": "Thüringen"
+   };
+
+   // Zusätzliches Mapping für zusammengefasste Bundesländer
+   const specialStateMapping = {
+      "Niedersachsen/Hamburg/Bremen": ["Niedersachsen", "Hamburg", "Bremen"]
+   };
+
    function showMap() {
       // Laden der entsprechenden Attributdatei, je nach Attributauswahl
       const filePath = attributeFilePaths[currentAttribute];
@@ -50,7 +71,6 @@
       Plotly.d3.text(filePath, function(err, text) {
          // Fehlerbehebung, falls Datei nicht geladen wird
          if (err) {
-            console.error("Fehler beim Laden der Datei:", filePath);
             return;
          }
 
@@ -71,13 +91,26 @@
                // Extrahieren der Werte für Deutschland und die Bundesländer
                for (let j = 1; j < headers.length; j++) {
                   const state = headers[j];
-                  // Prüfen, ob der Bundeslandname gültig ist
-                  if (!germanStates.includes(state)) germanStates.push(state);
-                  const val = parseFloat(parts[j].replace(",", "."));
-                  // Prüfen, ob der Wert eine gültige Zahl ist
-                  if (!isNaN(val)) {
-                     if (!stateValues[state]) stateValues[state] = {};
-                     stateValues[state][yearData] = val;
+                  if (specialStateMapping[state]) {
+                     // Wenn es ein kombiniertes Bundesland ist
+                     const val = parseFloat(parts[j].replace(",", "."));
+                     if (!isNaN(val)) {
+                        // Wert auf alle zugehörigen Bundesländer aufteilen
+                        specialStateMapping[state].forEach(subState => {
+                           if (!stateValues[subState]) stateValues[subState] = {};
+                           stateValues[subState][yearData] = val;
+                        });
+                     }
+                  } else {
+                     const mappedState = stateNameMapping[state] || state; // Mappen des Bundeslandnamens
+                     // Prüfen, ob der Bundeslandname gültig ist
+                     if (!germanStates.includes(mappedState)) germanStates.push(state);
+                     const val = parseFloat(parts[j].replace(",", "."));
+                     // Prüfen, ob der Wert eine gültige Zahl ist
+                     if (!isNaN(val)) {
+                        if (!stateValues[state]) stateValues[state] = {};
+                        stateValues[state][yearData] = val;
+                     }
                   }
                }
             }
@@ -88,7 +121,6 @@
          Plotly.d3.json("data/1_sehr_hoch.geo.json", function(err, geojson) {
             // Fehlerbehebung
             if (err) {
-               console.error("Fehler beim Laden der GeoJSON-Datei");
                return;
             }
 
@@ -114,25 +146,37 @@
                type: 'choropleth',
                locationmode: 'geojson-id',
                geojson: geojson,
-               locations: germanStates,
-               z: values,
+               locations: geojson.features.map(f => f.properties.name), // Verwende die Namen aus der GeoJSON
+               z: geojson.features.map(f => {
+                  const geoName = f.properties.name;
+                  // Finde den Original-Namen aus den Daten
+                  const origName = Object.keys(stateNameMapping).find(
+                     key => stateNameMapping[key] === geoName
+                  ) || geoName;
+                  return stateValues[origName] && stateValues[origName][currentYear] || null;
+               }),
                colorscale: colorScales[currentAttribute], // Farben je nach Attribut
                marker: { line: { width: 1, color: 'black' } },
                featureidkey: 'properties.name',
                // Tooltip-Text für Hover-Effekte
-               text: germanStates.map(state => {
-                  const val = stateValues[state] && stateValues[state][currentYear];
+               text: geojson.features.map(f => {
+                  const geoName = f.properties.name;
+                  // Finde den Original-Namen aus den Daten
+                  const origName = Object.keys(stateNameMapping).find(
+                     key => stateNameMapping[key] === geoName
+                  ) || geoName;
+                  const val = stateValues[origName] && stateValues[origName][currentYear];
                   return val !== undefined ? 
-                     `Wert: ${val} ${currentAttribute === 'sd' ? 'Stunden' : (currentAttribute === 'tm' ? '°C' : 'mm')}` : 
-                     "Daten fehlen";
+                     `${geoName}: ${val} ${currentAttribute === 'sd' ? 'Stunden' : (currentAttribute === 'tm' ? '°C' : 'mm')}` : 
+                     `${geoName}: Daten fehlen`;
                }),
-               hoverinfo: 'location+z+text',
+               hoverinfo: 'text',
                zmin: zmin,
                zmax: zmax,
                colorbar: {
                   title: currentAttribute === 'sd' ? 'Stunden' : (currentAttribute === 'tm' ? '°C' : 'mm'),
                   outlinewidth: 0
-               }
+               },
             };
 
             // Colorscales reversen, außer bei Lufttemperatur
@@ -149,9 +193,16 @@
                   projection: { type: 'mercator' },
                   fitbounds: "locations",
                   visible: true,
-                  bgcolor: 'white'
+                  bgcolor: 'white',
+                  showland: false,
+                  showframe: false,
+                  showcountries: false,
+                  resolution: 50,
+                  lonaxis: { range: [5, 16] }, // Längengradbereich für Deutschland
+                  lataxis: { range: [47, 55] } // Breitengradbereich für Deutschland
                },
-               margin: { t: 0, b: 0 }
+               margin: { t: 0, b: 0 },
+               dragmode: false,
             };
 
             // Erstellen der Karte in myDiv mit Plotly
@@ -259,12 +310,13 @@
       showLineChart();
    }
 
+   // Funktioniert noch nicht so gut
    // Debounce-Funktion, um die Anzahl der Aktualisierungen zu reduzieren -> bessere Performance
-   function debounce(func, delay) {
-      let timeout;
-      return function (...args) {
-         clearTimeout(timeout);
-         timeout = setTimeout(() => func.apply(this, args), delay);
+   function debounce(func, timeout = 300) {
+      let timer;
+      return (...args) => {
+         clearTimeout(timer);
+         timer = setTimeout(() => func.apply(this, args), timeout);
       };
    }
 
@@ -273,7 +325,7 @@
       const year = document.getElementById("yearSlider").value;
       updateYear(year);
       updateMapAndChart(document.getElementById("dropdown").value);
-   }, 300); // 300 ms Wartezeit nach letztem Input
+   }); // 300 ms Wartezeit nach letztem Input
 
    // Event-Listener für den Dropdown und den Slider
    document.getElementById("yearSlider").addEventListener("input", debouncedUpdate);
@@ -282,6 +334,12 @@
    document.getElementById("yearLabel").textContent = "Jahr: " + currentYear;
    showMap();
    showLineChart();
+
+   window.addEventListener("load", function() {
+      document.getElementById("yearSlider").value = 2024;
+      updateYear(2024);
+      updateMapAndChart(document.getElementById("dropdown").value);
+   });
 
    </script>
 
