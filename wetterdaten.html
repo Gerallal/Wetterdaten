@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
    <meta charset="UTF-8">
-   <title>Belegarbeit Versuch 2</title>
+   <title>Belegarbeit</title>
    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
    <link rel="stylesheet" href="wetterdaten.css" type="text/css">
 </head>
@@ -310,25 +310,16 @@
       showLineChart();
    }
 
-   // Funktioniert noch nicht so gut
-   // Debounce-Funktion, um die Anzahl der Aktualisierungen zu reduzieren -> bessere Performance
-   function debounce(func, timeout = 300) {
-      let timer;
-      return (...args) => {
-         clearTimeout(timer);
-         timer = setTimeout(() => func.apply(this, args), timeout);
-      };
-   }
-
-   // Aktualisierung des Jahres und der Karte/Diagramm
-   const debouncedUpdate = debounce(function () {
-      const year = document.getElementById("yearSlider").value;
-      updateYear(year);
-      updateMapAndChart(document.getElementById("dropdown").value);
-   }); // 300 ms Wartezeit nach letztem Input
-
    // Event-Listener für den Dropdown und den Slider
-   document.getElementById("yearSlider").addEventListener("input", debouncedUpdate);
+   document.getElementById("yearSlider").addEventListener("input", function(e) {
+      currentYear = e.target.value;
+      document.getElementById("yearLabel").textContent = "Jahr: " + currentYear;
+      showLineChart(); // Nur Line Chart wird aktualisiert
+   });
+
+   document.getElementById("yearSlider").addEventListener("change", function(e) {
+      showMap(); // Karte wird erst jetzt aktualisiert
+   });
 
    // Initialisierung der Karte und des Diagramms
    document.getElementById("yearLabel").textContent = "Jahr: " + currentYear;
@@ -338,7 +329,7 @@
    window.addEventListener("load", function() {
       document.getElementById("yearSlider").value = 2024;
       updateYear(2024);
-      updateMapAndChart(document.getElementById("dropdown").value);
+      updateMapAndChart(document.getElementById("dropdown").value = 'sd');
    });
 
    </script>
